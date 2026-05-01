@@ -1,0 +1,3 @@
+Citation
+If you utilize this mathematical framework or code in your research, please cite our paper:
+Adnan H. Abdulwahid and Faycal Znidi, "Multivector Morphological Networks: A Clifford Algebraic Taxonomy for Non-Reciprocal Circuit Synthesis," [Insert Journal/Conference Name], 2026.
