@@ -1,0 +1,17 @@
+Output of the Script
+
+--- Multivector Lattice Initialized ---
+
+Extracting Edge at Spatial Boundary (x=1, y=1):
+Scalar Divergence (Isotropic Dissipation): -2.5
+Bivector Curl [e12, e13, e23] (Edge Flux): [0.  2.5 0. ]
+
+--- Synthesized Local Admittance Matrix (Y) ---
+Row/Col indices correspond to Red, Green, Blue channels:
+[[-1.5  0.   2.5]
+ [ 0.  -1.5  0. ]
+ [-2.5  0.  -1.5]]
+
+Notice the skew-symmetric off-diagonals. These mathematically
+prove the requirement for active Gyrator components to realize
+the e13 chromatic transition in hardware.

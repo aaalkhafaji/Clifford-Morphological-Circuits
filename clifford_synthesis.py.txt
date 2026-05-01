@@ -1,0 +1,109 @@
+clifford_synthesis.py
+"""
+Clifford Morphological Circuit Synthesizer
+Author: Adnan Hashim Abdulwahid & Faycal Znidi
+Paper: Multivector Morphological Networks: A Clifford Algebraic Taxonomy...
+
+This script demonstrates the Lattice Isomorphism Theorem mapping a 
+spatial-chromatic image (Cl_3,0) to a physical Nodal Admittance Matrix (Y).
+"""
+
+import numpy as np
+
+class CliffordLattice:
+    def __init__(self, image_array):
+        """
+        Initializes the multivector lattice.
+        :param image_array: A numpy array of shape (H, W, 3) representing RGB channels.
+                            Mapped to Cl_3,0 basis vectors (e1, e2, e3).
+        """
+        self.state = np.array(image_array, dtype=float)
+        self.H, self.W, _ = self.state.shape
+        
+    def apply_dirac_operator(self):
+        """
+        Applies the discrete spatial Dirac operator \nabla = e1*(d/dx) + e2*(d/dy).
+        Calculates the Geometric Product to separate the state into 
+        Scalar Divergence (Passivity) and Bivector Curl (Non-Reciprocity).
+        """
+        # Calculate spatial gradients (forward difference for simplicity)
+        dy, dx = np.gradient(self.state, axis=(0, 1))
+        
+        # Given \nabla = e1*dx + e2*dy, and state V = v1*e1 + v2*e2 + v3*e3:
+        # e1 * (v1*e1 + v2*e2 + v3*e3) = v1 + v2*e12 + v3*e13
+        # e2 * (v1*e1 + v2*e2 + v3*e3) = -v1*e12 + v2 + v3*e23
+        
+        # 1. Scalar Divergence (Sum of dot products)
+        self.divergence = dx[:, :, 0] + dy[:, :, 1]
+        
+        # 2. Bivector Curl (Wedge products)
+        e12 = dx[:, :, 1] - dy[:, :, 0]
+        e13 = dx[:, :, 2]
+        e23 = dy[:, :, 2]
+        self.curl = np.stack([e12, e13, e23], axis=-1)
+        
+        return self.divergence, self.curl
+
+    def synthesize_admittance_matrix(self, x, y, baseline_G=1.0):
+        """
+        Synthesizes the local 3x3 Admittance Matrix Y for the RGB phases at node (x,y).
+        - Diagonal (Symmetric) = Baseline Conductance modulated by Divergence
+        - Off-Diagonal (Skew-Symmetric) = Gyrator couplings driven by the Bivector Curl
+        """
+        div = self.divergence[y, x]
+        curl = self.curl[y, x] # [e12, e13, e23]
+        
+        # Diagonal elements (Resistive Shunts / Passivity)
+        # Modulated by local scalar dissipation
+        G_local = baseline_G + div 
+        
+        Y_local = np.zeros((3, 3))
+        np.fill_diagonal(Y_local, G_local)
+        
+        # Off-Diagonal elements (Gyrator Transadmittances / Non-Reciprocity)
+        # Y_ij = -Y_ji required for bivector rotation
+        Y_local[0, 1] =  curl[0]  # e12 coupling (Red-Green)
+        Y_local[1, 0] = -curl[0]
+        
+        Y_local[0, 2] =  curl[1]  # e13 coupling (Red-Blue)
+        Y_local[2, 0] = -curl[1]
+        
+        Y_local[1, 2] =  curl[2]  # e23 coupling (Green-Blue)
+        Y_local[2, 1] = -curl[2]
+        
+        return Y_local
+
+# ==========================================
+# Example Execution: The Red/Blue Step Edge 
+# (Matching Example 2 in the Paper)
+# ==========================================
+if __name__ == "__main__":
+    # Create a 3x3 lattice. Left side is Red (5e1), Right side is Blue (5e3).
+    # [e1, e2, e3] -> [R, G, B]
+    image_grid = np.zeros((3, 3, 3))
+    
+    # Fill Left column with Red (5, 0, 0)
+    image_grid[:, 0, 0] = 5.0
+    # Fill Center and Right columns with Blue (0, 0, 5)
+    image_grid[:, 1:, 2] = 5.0
+
+    print("--- Multivector Lattice Initialized ---")
+    
+    # Process the lattice
+    lattice = CliffordLattice(image_grid)
+    div, curl = lattice.apply_dirac_operator()
+    
+    print("\nExtracting Edge at Spatial Boundary (x=1, y=1):")
+    print(f"Scalar Divergence (Isotropic Dissipation): {div[1, 1]}")
+    print(f"Bivector Curl [e12, e13, e23] (Edge Flux): {curl[1, 1]}")
+    
+    # Synthesize the hardware matrix
+    Y_matrix = lattice.synthesize_admittance_matrix(x=1, y=1)
+    
+    print("\n--- Synthesized Local Admittance Matrix (Y) ---")
+    print("Row/Col indices correspond to Red, Green, Blue channels:")
+    print(np.round(Y_matrix, 2))
+    
+    print("\nNotice the skew-symmetric off-diagonals. These mathematically")
+    print("prove the requirement for active Gyrator components to realize")
+    print("the e13 chromatic transition in hardware.")
