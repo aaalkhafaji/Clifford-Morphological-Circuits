@@ -1,0 +1,160 @@
+import numpy as np
+import matplotlib.pyplot as plt
+from scipy.ndimage import gaussian_filter
+import zipfile
+import os
+from google.colab import files
+
+# ==========================================
+# Figure 9: Bivector-Induced Non-Reciprocity
+# ==========================================
+g = 0.5  # Gyrator transconductance (Siemens)
+V_sweep = np.linspace(-10, 10, 100)
+
+I3_response = g * V_sweep 
+I1_response = -g * V_sweep
+
+fig9, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+
+ax1.plot(V_sweep, I3_response, color='blue', linewidth=2, label=r'$I_3 = g V_1$')
+ax1.set_title(r'(c) Induced Blue-Rail Current', fontsize=12)
+ax1.set_xlabel(r'Red-Rail Excitation $V_1$ (V)', fontsize=11)
+ax1.set_ylabel(r'Blue-Rail Current $I_3$ (A)', fontsize=11)
+ax1.axhline(0, color='black', linewidth=0.8, linestyle='--')
+ax1.axvline(0, color='black', linewidth=0.8, linestyle='--')
+ax1.grid(True, alpha=0.3)
+ax1.legend()
+
+ax2.plot(V_sweep, I1_response, color='red', linewidth=2, label=r'$I_1 = -g V_3$')
+ax2.set_title(r'(d) Induced Red-Rail Current', fontsize=12)
+ax2.set_xlabel(r'Blue-Rail Excitation $V_3$ (V)', fontsize=11)
+ax2.set_ylabel(r'Red-Rail Current $I_1$ (A)', fontsize=11)
+ax2.axhline(0, color='black', linewidth=0.8, linestyle='--')
+ax2.axvline(0, color='black', linewidth=0.8, linestyle='--')
+ax2.grid(True, alpha=0.3)
+ax2.legend()
+
+plt.tight_layout()
+fig9.savefig('Fig9_NonReciprocity.pdf', format='pdf', bbox_inches='tight')
+plt.close(fig9) # Close to keep Colab output clean
+
+# ==========================================
+# Figure 10: 1D Chromatic Edge Localization
+# ==========================================
+x = np.linspace(0, 10, 100)
+x0 = 5.0
+
+V1 = np.where(x < x0, 5.0, 0.0)
+V3 = np.where(x >= x0, 5.0, 0.0)
+
+dx = x[1] - x[0]
+dV1_dx = np.gradient(V1, dx)
+dV3_dx = np.gradient(V3, dx)
+
+scalar_div = dV1_dx 
+E13 = np.abs(dV3_dx)
+Ig = 0.5 * E13
+
+fig10, axs = plt.subplots(4, 1, figsize=(6, 8), sharex=True)
+
+axs[0].plot(x, V1, color='red', label='Red ($5e_1$)')
+axs[0].plot(x, V3, color='blue', label='Blue ($5e_3$)')
+axs[0].set_title(r'(a) 1D Chromatic Step Excitation $\mathbf{V}(x)$')
+axs[0].legend(loc='center right')
+
+axs[1].plot(x, scalar_div, color='green')
+axs[1].set_title(r'(b) Scalar Component $\langle \nabla \mathbf{V} \rangle_0$')
+
+axs[2].plot(x, E13, color='purple')
+axs[2].set_title(r'(c) Bivector Edge Magnitude $E_{13}(x)$')
+
+axs[3].plot(x, Ig, color='orange', linewidth=2)
+axs[3].set_title(r'(d) Localized Gyrator Branch Current $I_g(x)$')
+axs[3].set_xlabel('Spatial Coordinate $x$')
+
+for ax in axs:
+    ax.grid(True, alpha=0.3)
+
+plt.tight_layout()
+fig10.savefig('Fig10_EdgeLocalization.pdf', format='pdf', bbox_inches='tight')
+plt.close(fig10)
+
+# ==========================================
+# Figure 11: 2D Memristive Anisotropic Diffusion
+# ==========================================
+size = 100
+image = np.zeros((size, size, 3))
+image[:, :size//2, 0] = 1.0 
+image[:, size//2:, 2] = 1.0 
+
+np.random.seed(42)
+noisy_image = image + np.random.normal(0, 0.2, image.shape)
+noisy_image = np.clip(noisy_image, 0, 1)
+
+grad_x_R, grad_y_R = np.gradient(noisy_image[:,:,0])
+grad_x_B, grad_y_B = np.gradient(noisy_image[:,:,2])
+
+bivector_mag = np.sqrt(grad_x_B**2 + grad_y_R**2) 
+
+D0 = 1.0
+k = 0.1 
+D_xy = D0 / (1.0 + (bivector_mag**2 / k**2))
+
+isotropic_result = gaussian_filter(noisy_image, sigma=1.5)
+
+memristive_result = noisy_image.copy()
+for c in range(3):
+    smoothed = gaussian_filter(noisy_image[:,:,c], sigma=2.0)
+    memristive_result[:,:,c] = D_xy * smoothed + (1 - D_xy) * noisy_image[:,:,c]
+
+fig11, axs = plt.subplots(2, 3, figsize=(12, 8))
+
+axs[0, 0].imshow(noisy_image)
+axs[0, 0].set_title('(a) Noisy RGB Input')
+
+im1 = axs[0, 1].imshow(bivector_mag, cmap='magma')
+axs[0, 1].set_title('(b) Bivector Magnitude $||E||$')
+plt.colorbar(im1, ax=axs[0, 1], fraction=0.046, pad=0.04)
+
+im2 = axs[0, 2].imshow(D_xy, cmap='viridis')
+axs[0, 2].set_title('(c) Memristive Conductance $D(x,y)$')
+plt.colorbar(im2, ax=axs[0, 2], fraction=0.046, pad=0.04)
+
+axs[1, 0].imshow(isotropic_result)
+axs[1, 0].set_title('(d) Isotropic Diffusion')
+
+axs[1, 1].imshow(memristive_result)
+axs[1, 1].set_title('(e) Clifford-Memristive Diffusion')
+
+axs[1, 2].plot(noisy_image[50, :, 0], label='Noisy Red', alpha=0.3)
+axs[1, 2].plot(isotropic_result[50, :, 0], label='Isotropic', linestyle='--')
+axs[1, 2].plot(memristive_result[50, :, 0], label='Memristive', color='black')
+axs[1, 2].set_title('(f) Line Profile (Red Channel)')
+axs[1, 2].legend()
+
+for ax in axs.flat[:5]:
+    ax.axis('off')
+
+plt.tight_layout()
+fig11.savefig('Fig11_MemristiveDiffusion.pdf', format='pdf', bbox_inches='tight')
+plt.close(fig11)
+
+# ==========================================
+# Zip and Download
+# ==========================================
+pdf_files = [
+    'Fig9_NonReciprocity.pdf', 
+    'Fig10_EdgeLocalization.pdf', 
+    'Fig11_MemristiveDiffusion.pdf'
+]
+
+zip_name = 'Clifford_Validation_Figures.zip'
+
+with zipfile.ZipFile(zip_name, 'w') as zipf:
+    for pdf in pdf_files:
+        if os.path.exists(pdf):
+            zipf.write(pdf)
+            print(f"Added {pdf} to zip.")
+
+print(f"Downloading {zip_name}...")
+files.download(zip_name)
