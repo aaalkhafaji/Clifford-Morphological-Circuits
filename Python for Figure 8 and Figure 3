@@ -1,0 +1,128 @@
+import matplotlib.pyplot as plt
+import networkx as nx
+import numpy as np
+import matplotlib.patches as mpatches
+import zipfile
+import os
+from google.colab import files
+
+# Set global academic plot styles
+plt.rcParams.update({
+    "font.family": "serif",
+    "font.size": 12,
+    "axes.titlesize": 14
+})
+
+def generate_figure_3():
+    """Generates Fig 3: Distributed Clifford Lattice Representation"""
+    fig, ax = plt.subplots(figsize=(7, 7))
+    
+    # Create a 3x3 grid graph
+    grid_size = 3
+    G = nx.grid_2d_graph(grid_size, grid_size)
+    pos = {(x,y): (y, -x) for x, y in G.nodes()} 
+    
+    # Draw horizontal edges (Red Rail - e1)
+    horiz_edges = [e for e in G.edges() if e[0][0] == e[1][0]]
+    nx.draw_networkx_edges(G, pos, edgelist=horiz_edges, edge_color='#D62728', width=4, ax=ax)
+    
+    # Draw vertical edges (Green Rail - e2)
+    vert_edges = [e for e in G.edges() if e[0][1] == e[1][1]]
+    nx.draw_networkx_edges(G, pos, edgelist=vert_edges, edge_color='#2CA02C', width=4, ax=ax)
+    
+    # Draw diagonal edges (Blue Rail - e3 bivector interactions)
+    diag_edges = [((x,y), (x+1, y+1)) for x in range(grid_size-1) for y in range(grid_size-1)]
+    G.add_edges_from(diag_edges)
+    nx.draw_networkx_edges(G, pos, edgelist=diag_edges, edge_color='#1F77B4', width=3, style='dashed', ax=ax)
+    
+    # Draw Nodes
+    nx.draw_networkx_nodes(G, pos, node_color='white', edgecolors='black', node_size=1000, linewidths=2, ax=ax)
+    
+    # Add Math Labels
+    labels = {node: f"$V_{{{node[0]},{node[1]}}}$" for node in G.nodes()}
+    nx.draw_networkx_labels(G, pos, labels=labels, font_size=11, ax=ax)
+    
+    # Custom Legend
+    red_line = mpatches.Patch(color='#D62728', label='Red Rail ($e_1$)')
+    green_line = mpatches.Patch(color='#2CA02C', label='Green Rail ($e_2$)')
+    blue_line = mpatches.Patch(color='#1F77B4', label='Blue Rail ($e_3$)')
+    ax.legend(handles=[red_line, green_line, blue_line], loc='upper right', framealpha=0.9)
+    
+    ax.set_title("Distributed Multivector Morphological Lattice", pad=20, fontweight='bold')
+    ax.axis('off')
+    
+    plt.tight_layout()
+    plt.savefig('Fig3_Lattice.pdf', format='pdf', bbox_inches='tight')
+    plt.close()
+
+def generate_figure_8():
+    """Generates Fig 8: Restricted Image-to-Admittance Correspondence"""
+    fig, axs = plt.subplots(1, 3, figsize=(14, 5), gridspec_kw={'width_ratios': [1, 0.2, 1.2]})
+    
+    # --- LEFT: Image Grid (Spatial-Chromatic State) ---
+    # Create a structured RGB matrix mimicking an edge/corner
+    img_data = np.zeros((4, 4, 3))
+    img_data[0:2, 0:2] = [0.8, 0.2, 0.2] # Red region
+    img_data[2:4, 0:2] = [0.2, 0.8, 0.2] # Green region
+    img_data[0:4, 2:4] = [0.2, 0.2, 0.8] # Blue region
+    
+    axs[0].imshow(img_data, extent=[0, 4, 0, 4])
+    # Draw grid lines to make it look like discrete pixels
+    for x in range(5):
+        axs[0].axhline(x, color='white', lw=2)
+        axs[0].axvline(x, color='white', lw=2)
+    axs[0].set_title("Multivector Lattice State $\mathbf{V}$", pad=15)
+    axs[0].axis('off')
+    
+    # --- MIDDLE: Mapping Arrow ---
+    axs[1].axis('off')
+    axs[1].annotate('', xy=(0.9, 0.5), xytext=(0.1, 0.5),
+                    arrowprops=dict(facecolor='black', shrink=0.05, width=5, headwidth=15))
+    axs[1].text(0.5, 0.6, 'Admissible\nMapping', ha='center', va='bottom', fontsize=10)
+    
+    # --- RIGHT: Admittance Matrix (Y) ---
+    N = 16 # 4x4 grid flattened
+    mat = np.ones((N, N, 3)) * 0.95 # Light gray background
+    
+    # Populate the mathematical structure of the Admittance Matrix
+    for i in range(N):
+        mat[i, i] = [0.3, 0.3, 0.3] # Dark Gray Diagonal (Symmetric Dissipative)
+        if i < N-1:
+            # Immediate neighbors (horizontal skew-symmetry)
+            mat[i, i+1] = [0.8, 0.2, 0.2] # Red
+            mat[i+1, i] = [0.2, 0.2, 0.8] # Blue
+        if i < N-4:
+            # Vertical neighbors (vertical skew-symmetry)
+            mat[i, i+4] = [0.2, 0.8, 0.2] # Green
+            mat[i+4, i] = [0.8, 0.2, 0.8] # Purple
+            
+    axs[2].imshow(mat)
+    axs[2].set_title("Nodal Admittance Matrix $\mathbf{Y}$", pad=15)
+    axs[2].axis('off')
+    
+    # Add a custom legend for the matrix
+    sym_patch = mpatches.Patch(color=[0.3, 0.3, 0.3], label='Diagonal: Symmetric (Dissipative $G$)')
+    skew_patch = mpatches.Patch(color=[0.8, 0.2, 0.2], label='Off-Diagonal: Skew-Symmetric (Non-reciprocal $g$)')
+    axs[2].legend(handles=[sym_patch, skew_patch], loc='lower center', bbox_to_anchor=(0.5, -0.15), ncol=1, fontsize=10)
+    
+    plt.tight_layout()
+    plt.savefig('Fig8_Admittance.pdf', format='pdf', bbox_inches='tight')
+    plt.close()
+
+# 1. Generate the figures
+print("Generating Figure 3 (Distributed Lattice)...")
+generate_figure_3()
+
+print("Generating Figure 8 (Admittance Correspondence)...")
+generate_figure_8()
+
+# 2. Bundle them into a ZIP file
+zip_filename = 'Clifford_Lattice_Figures.zip'
+with zipfile.ZipFile(zip_filename, 'w') as zipf:
+    zipf.write('Fig3_Lattice.pdf')
+    zipf.write('Fig8_Admittance.pdf')
+
+print(f"Successfully created {zip_filename}!")
+
+# 3. Automatically trigger the download to your computer
+files.download(zip_filename)
